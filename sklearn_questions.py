@@ -60,50 +60,50 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
 class MonthlySplit(BaseCrossValidator):
     """Cross-validator based on successive monthly splits."""
 
-    def __init__(self, time_col="index"):  # noqa: D107
+    def __init__(self, time_col="index"):
         self.time_col = time_col
 
-    def _get_time(self, X):
-        """Extract datetime information from X."""
-        # Case 1: Series → time is index
+    def __repr__(self):
+        return f"MonthlySplit(time_col='{self.time_col}')"
+
+    def _get_datetime(self, X):
+        """Extract datetime index used for splitting."""
         if isinstance(X, pd.Series):
             time = X.index
 
-        # Case 2: DataFrame
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
             else:
                 if self.time_col not in X.columns:
-                    raise ValueError("time_col not found in X")
+                    raise ValueError("datetime")
                 time = X[self.time_col]
 
         else:
-            raise TypeError("X must be a pandas Series or DataFrame")
+            raise TypeError("unsupported Type")
 
         # Convert Series → DatetimeIndex
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
-                raise TypeError("time column must be datetime")
+                raise ValueError("datetime")
             time = pd.DatetimeIndex(time.values)
 
-        # Validate index
         if not isinstance(time, pd.DatetimeIndex):
-            raise TypeError("time must be a DatetimeIndex")
+            raise ValueError("datetime")
 
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
-        """Return number of splitting iterations."""
-        time = self._get_time(X)
-        months = time.to_period("M").unique()
+        time = self._get_datetime(X)
+        months = np.sort(time.to_period("M").unique())
         return max(len(months) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-        """Generate train/test indices."""
-        time = self._get_time(X)
+        time = self._get_datetime(X)
         months = time.to_period("M")
-        unique_months = months.unique()
+
+        # SORT MONTHS — NOT DATA
+        unique_months = np.sort(months.unique())
 
         for m_train, m_test in zip(unique_months[:-1], unique_months[1:]):
             train_idx = np.where(months == m_train)[0]
