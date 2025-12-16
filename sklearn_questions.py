@@ -67,7 +67,6 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        """Extract datetime index used for splitting."""
         if isinstance(X, pd.Series):
             time = X.index
 
@@ -101,11 +100,14 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
         months = time.to_period("M")
-
-        # SORT MONTHS — NOT DATA
         unique_months = np.sort(months.unique())
 
-        for m_train, m_test in zip(unique_months[:-1], unique_months[1:]):
-            train_idx = np.where(months == m_train)[0]
-            test_idx = np.where(months == m_test)[0]
+        for i in range(1, len(unique_months)):
+            test_month = unique_months[i]
+            train_mask = months < test_month
+            test_mask = months == test_month
+
+            train_idx = np.where(train_mask)[0]
+            test_idx = np.where(test_mask)[0]
+
             yield train_idx, test_idx
