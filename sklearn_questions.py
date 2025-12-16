@@ -60,13 +60,7 @@ class MonthlySplit(BaseCrossValidator):
     """Monthly time-based cross-validator."""
 
     def __init__(self, time_col="index"):
-        """Initialize the splitter.
-
-        Parameters
-        ----------
-        time_col : str, default="index"
-            Column containing datetime values or "index".
-        """
+        """Initialize the splitter."""
         self.time_col = time_col
 
     def __repr__(self):
@@ -74,10 +68,9 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        """Extract datetime information from X."""
+        """Extract datetime index or column."""
         if isinstance(X, pd.Series):
             time = X.index
-
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -85,7 +78,6 @@ class MonthlySplit(BaseCrossValidator):
                 if self.time_col not in X.columns:
                     raise ValueError("datetime")
                 time = X[self.time_col]
-
         else:
             raise ValueError("datetime")
 
@@ -102,18 +94,14 @@ class MonthlySplit(BaseCrossValidator):
     def get_n_splits(self, X, y=None, groups=None):
         """Return number of splits."""
         time = self._get_datetime(X)
-        months = time.to_period("M").unique()
-        return max(len(months) - 1, 0)
+        return max(len(time.to_period("M").unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-        """Generate train/test indices."""
+        """Generate indices."""
         time = self._get_datetime(X)
-
-        # ORIGINAL indices (do NOT reorder X)
-        indices = np.arange(len(time))
-
         months = time.to_period("M")
         unique_months = np.sort(months.unique())
+        indices = np.arange(len(time))
 
         for month in unique_months[1:]:
             train_idx = indices[months < month]
