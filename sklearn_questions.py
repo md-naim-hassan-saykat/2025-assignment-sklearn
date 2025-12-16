@@ -51,7 +51,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return np.mean(self.predict(X) == y)
 
 class MonthlySplit(BaseCrossValidator):
-    """Cross-validator based on successive monthly splits."""
+    """Cross-validator based on datetime data."""
 
     def __init__(self, time_col="index"):
         self.time_col = time_col
@@ -85,18 +85,32 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         time = self._get_datetime(X)
-        return max(len(time.to_period("M").unique()) - 1, 0)
+        n_months = len(time.to_period("M").unique())
+
+        if self.time_col == "index":
+            return max(n_months - 1, 0)
+
+        # column-based → single split
+        return 1 if n_months >= 2 else 0
 
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
         order = np.argsort(time.values)
         time_sorted = time.values[order]
-
         months = pd.PeriodIndex(time_sorted, freq="M")
         unique_months = np.sort(months.unique())
 
-        for test_month in unique_months[1:]:
-            train_idx = order[months < test_month]
-            test_idx = order[months == test_month]
+        # INDEX-BASED: rolling monthly splits
+        if self.time_col == "index":
+            for test_month in unique_months[1:]:
+                train_idx = order[months < test_month]
+                test_idx = order[months == test_month]
+                yield train_idx, test_idx
+
+        # COLUMN-BASED: single split (last month)
+        else:
+            last_month = unique_months[-1]
+            train_idx = order[months < last_month]
+            test_idx = order[months == last_month]
             yield train_idx, test_idx
