@@ -57,15 +57,15 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return np.mean(y_pred == y)
 
 class MonthlySplit(BaseCrossValidator):
-    """Cross-validator that splits data using cumulative monthly splits."""
+    """Monthly time-based cross-validator."""
 
     def __init__(self, time_col="index"):
-        """Initialize the MonthlySplit.
+        """Initialize the splitter.
 
         Parameters
         ----------
         time_col : str, default="index"
-            Column name containing datetime values, or "index".
+            Column containing datetime values or "index".
         """
         self.time_col = time_col
 
@@ -74,18 +74,7 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        """Extract datetime index from input data.
-
-        Parameters
-        ----------
-        X : pandas Series or DataFrame
-            Input data.
-
-        Returns
-        -------
-        pandas.DatetimeIndex
-            Datetime index aligned with X.
-        """
+        """Extract datetime information from X."""
         if isinstance(X, pd.Series):
             time = X.index
 
@@ -111,25 +100,22 @@ class MonthlySplit(BaseCrossValidator):
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
-        """Return number of splitting iterations."""
+        """Return number of splits."""
         time = self._get_datetime(X)
         months = time.to_period("M").unique()
         return max(len(months) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-        """Generate indices for cumulative monthly splits."""
+        """Generate train/test indices."""
         time = self._get_datetime(X)
 
-        order = np.argsort(time.values)
-        time_sorted = time.values[order]
-        months = pd.PeriodIndex(time_sorted, freq="M")
-        unique_months = np.unique(months)
+        # ORIGINAL indices (do NOT reorder X)
+        indices = np.arange(len(time))
 
-        for i in range(1, len(unique_months)):
-            train_mask = months < unique_months[i]
-            test_mask = months == unique_months[i]
+        months = time.to_period("M")
+        unique_months = np.sort(months.unique())
 
-            train_idx = order[train_mask]
-            test_idx = order[test_mask]
-
+        for month in unique_months[1:]:
+            train_idx = indices[months < month]
+            test_idx = indices[months == month]
             yield train_idx, test_idx
