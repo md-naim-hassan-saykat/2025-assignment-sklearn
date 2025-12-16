@@ -124,27 +124,31 @@ class MonthlySplit(BaseCrossValidator):
         return max(len(months.unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-        """Generate indices to split data into training and test set."""
-        time = self._get_datetime(X)
+    """Generate train/test indices."""
+    time = self._get_datetime(X)
 
-        # Sort by time (handles shuffled X). We return indices into original X.
-        order = np.argsort(time.values)
-        time_sorted = time.values[order]
-        months_sorted = pd.PeriodIndex(time_sorted, freq="M")
-        unique_months = np.sort(months_sorted.unique())
+    # Sort by time (important if data is shuffled)
+    order = np.argsort(time.values)
+    time_sorted = time.values[order]
 
-        if len(unique_months) <= 1:
-            return
+    months = pd.PeriodIndex(time_sorted, freq="M")
+    unique_months = np.sort(months.unique())
 
-        if self.time_col == "index":
-            # Expanding window: all months before current test month
-            for test_month in unique_months[1:]:
-                train_idx = order[months_sorted < test_month]
-                test_idx = order[months_sorted == test_month]
-                yield train_idx, test_idx
-        else:
-            # Rolling window: previous month -> next month
-            for prev_month, curr_month in zip(unique_months[:-1], unique_months[1:]):
-                train_idx = order[months_sorted == prev_month]
-                test_idx = order[months_sorted == curr_month]
-                yield train_idx, test_idx
+    if len(unique_months) <= 1:
+        return
+
+    # CASE 1: index-based → expanding window
+    if self.time_col == "index":
+        for test_month in unique_months[1:]:
+            train_idx = order[months < test_month]
+            test_idx = order[months == test_month]
+            yield train_idx, test_idx
+
+    # CASE 2: column-based → rolling 1-month window
+    else:
+        for prev_month, curr_month in zip(
+            unique_months[:-1], unique_months[1:]
+        ):
+            train_idx = order[months == prev_month]
+            test_idx = order[months == curr_month]
+            yield train_idx, test_idx
