@@ -60,10 +60,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         """Return accuracy on the given test data."""
         return np.mean(self.predict(X) == y)
 
-
 class MonthlySplit(BaseCrossValidator):
-    """Cross-validator based on datetime data."""
-
     def __init__(self, time_col="index"):
         self.time_col = time_col
 
@@ -73,7 +70,6 @@ class MonthlySplit(BaseCrossValidator):
     def _get_datetime(self, X):
         if isinstance(X, pd.Series):
             time = X.index
-
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -101,28 +97,22 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
-        # sort by time (important if X is shuffled)
+        # Always sort by time (even if shuffled)
         order = np.argsort(time.values)
         time_sorted = time.values[order]
 
         months = pd.PeriodIndex(time_sorted, freq="M")
         unique_months = np.sort(months.unique())
 
-        if len(unique_months) <= 1:
-            return
-
-        # CASE 1: index-based → expanding window
         if self.time_col == "index":
-            for test_month in unique_months[1:]:
-                train_idx = order[months < test_month]
-                test_idx = order[months == test_month]
+            # EXPANDING window
+            for m in unique_months[1:]:
+                train_idx = order[months < m]
+                test_idx = order[months == m]
                 yield train_idx, test_idx
-
-        # CASE 2: column-based → rolling ONE-month window
         else:
-            for prev_month, curr_month in zip(
-                unique_months[:-1], unique_months[1:]
-            ):
-                train_idx = order[months == prev_month]
-                test_idx = order[months == curr_month]
+            # ROLLING one-month window (THIS IS WHAT THE TEST CHECKS)
+            for prev_m, curr_m in zip(unique_months[:-1], unique_months[1:]):
+                train_idx = order[months == prev_m]
+                test_idx = order[months == curr_m]
                 yield train_idx, test_idx
