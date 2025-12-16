@@ -82,7 +82,7 @@ class MonthlySplit(BaseCrossValidator):
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
-            time = pd.DatetimeIndex(time.values)
+            time = pd.DatetimeIndex(time)
 
         if not isinstance(time, pd.DatetimeIndex):
             raise ValueError("datetime")
@@ -91,19 +91,18 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         time = self._get_datetime(X)
-        months = pd.unique(time.to_period("M"))
+        months = np.sort(time.to_period("M").unique())
         return max(len(months) - 1, 0)
 
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
         order = np.argsort(time.values)
-        months = pd.PeriodIndex(time.values[order], freq="M")
+        time_sorted = time.values[order]
+        months_sorted = pd.PeriodIndex(time_sorted, freq="M")
+        unique_months = np.sort(pd.unique(months_sorted))
 
-        # THIS IS THE CRITICAL FIX
-        unique_months = np.sort(pd.unique(months))
-
-        for i in range(1, len(unique_months)):
-            train_idx = order[months == unique_months[i - 1]]
-            test_idx = order[months == unique_months[i]]
+        for i in range(len(unique_months) - 1):
+            train_idx = order[months_sorted == unique_months[i]]
+            test_idx = order[months_sorted == unique_months[i + 1]]
             yield train_idx, test_idx
