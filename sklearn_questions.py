@@ -79,7 +79,6 @@ class MonthlySplit(BaseCrossValidator):
         else:
             raise ValueError("datetime")
 
-        # Accept datetime Series and convert
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
@@ -100,7 +99,9 @@ class MonthlySplit(BaseCrossValidator):
 
         order = np.argsort(time.values)
         months = pd.PeriodIndex(time.values[order], freq="M")
-        unique_months = pd.unique(months)
+
+        # THIS IS THE CRITICAL FIX
+        unique_months = np.sort(pd.unique(months))
 
         for i in range(1, len(unique_months)):
             train_idx = order[months == unique_months[i - 1]]
