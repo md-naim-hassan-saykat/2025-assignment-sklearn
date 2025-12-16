@@ -95,24 +95,26 @@ class MonthlySplit(BaseCrossValidator):
         return max(len(time.to_period("M").unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-        time = self._get_datetime(X)
+    time = self._get_datetime(X)
 
-        # Always sort by time (even if shuffled)
-        order = np.argsort(time.values)
-        time_sorted = time.values[order]
+    # Sort by time (important if shuffled)
+    order = np.argsort(time.values)
+    time_sorted = time.values[order]
 
-        months = pd.PeriodIndex(time_sorted, freq="M")
-        unique_months = np.sort(months.unique())
+    months = pd.PeriodIndex(time_sorted, freq="M")
+    unique_months = np.sort(months.unique())
 
-        if self.time_col == "index":
-            # EXPANDING window
-            for m in unique_months[1:]:
-                train_idx = order[months < m]
-                test_idx = order[months == m]
-                yield train_idx, test_idx
-        else:
-            # ROLLING one-month window (THIS IS WHAT THE TEST CHECKS)
-            for prev_m, curr_m in zip(unique_months[:-1], unique_months[1:]):
-                train_idx = order[months == prev_m]
-                test_idx = order[months == curr_m]
-                yield train_idx, test_idx
+    if self.time_col == "index":
+        # EXPANDING window
+        for test_month in unique_months[1:]:
+            train_idx = order[months < test_month]
+            test_idx = order[months == test_month]
+            yield train_idx, test_idx
+    else:
+        # ROLLING one-month window (this is what test_time_split_on_column checks)
+        for prev_month, curr_month in zip(
+            unique_months[:-1], unique_months[1:]
+        ):
+            train_idx = order[months == prev_month]
+            test_idx = order[months == curr_month]
+            yield train_idx, test_idx
