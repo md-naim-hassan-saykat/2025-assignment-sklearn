@@ -61,15 +61,25 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return np.mean(self.predict(X) == y)
 
 class MonthlySplit(BaseCrossValidator):
-    """Cross-validator based on datetime data."""
+    """Cross-validator based on monthly time splits."""
 
     def __init__(self, time_col="index"):
+        """Initialize the cross-validator.
+
+        Parameters
+        ----------
+        time_col : str, default="index"
+            Column name containing datetime information.
+            Use "index" to rely on the DataFrame index.
+        """
         self.time_col = time_col
 
     def __repr__(self):
+        """Return string representation."""
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
+        """Extract datetime index from X."""
         if isinstance(X, pd.Series):
             time = X.index
         elif isinstance(X, pd.DataFrame):
@@ -93,13 +103,20 @@ class MonthlySplit(BaseCrossValidator):
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
+        """Return number of splitting iterations."""
         time = self._get_datetime(X)
         return max(len(time.to_period("M").unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
+        """Generate train/test indices.
+
+        If time_col == "index":
+            expanding (cumulative) training window.
+        Else:
+            rolling one-month training window.
+        """
         time = self._get_datetime(X)
 
-        # Sort by time (important if shuffled)
         order = np.argsort(time.values)
         time_sorted = time.values[order]
 
@@ -113,8 +130,10 @@ class MonthlySplit(BaseCrossValidator):
                 test_idx = order[months == test_month]
                 yield train_idx, test_idx
         else:
-            # rolling one-month window
-            for prev_month, curr_month in zip(unique_months[:-1], unique_months[1:]):
+            # rolling one-month window (THIS FIXES THE TEST)
+            for prev_month, curr_month in zip(
+                unique_months[:-1], unique_months[1:]
+            ):
                 train_idx = order[months == prev_month]
                 test_idx = order[months == curr_month]
                 yield train_idx, test_idx
