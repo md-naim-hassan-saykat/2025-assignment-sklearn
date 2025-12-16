@@ -61,6 +61,8 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return np.mean(self.predict(X) == y)
 
 class MonthlySplit(BaseCrossValidator):
+    """Cross-validator based on datetime data."""
+
     def __init__(self, time_col="index"):
         self.time_col = time_col
 
@@ -68,8 +70,10 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
+        # Accept DataFrame, Series
         if isinstance(X, pd.Series):
             time = X.index
+
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -80,20 +84,27 @@ class MonthlySplit(BaseCrossValidator):
         else:
             raise ValueError("datetime")
 
+        # Convert to DatetimeIndex if it is a Series
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
             time = pd.DatetimeIndex(time)
 
+        # Must be DatetimeIndex now
         if not isinstance(time, pd.DatetimeIndex):
             raise ValueError("datetime")
 
         return time
 
-           def split(self, X, y=None, groups=None):
+    def get_n_splits(self, X, y=None, groups=None):
+        time = self._get_datetime(X)
+        n_months = len(time.to_period("M").unique())
+        return max(n_months - 1, 0)
+
+    def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
-        # Sort by time (important if shuffled)
+        # Sort by time (works even if X is shuffled)
         order = np.argsort(time.values)
         time_sorted = time.values[order]
 
@@ -101,16 +112,14 @@ class MonthlySplit(BaseCrossValidator):
         unique_months = np.sort(months.unique())
 
         if self.time_col == "index":
-            # CUMULATIVE expanding window
+            # expanding / cumulative: train = all before test month
             for test_month in unique_months[1:]:
                 train_idx = order[months < test_month]
                 test_idx = order[months == test_month]
                 yield train_idx, test_idx
         else:
-            # SINGLE previous month only
-            for prev_month, curr_month in zip(
-                unique_months[:-1], unique_months[1:]
-            ):
+            # rolling: train = previous month only, test = current month
+            for prev_month, curr_month in zip(unique_months[:-1], unique_months[1:]):
                 train_idx = order[months == prev_month]
                 test_idx = order[months == curr_month]
                 yield train_idx, test_idx
