@@ -18,15 +18,13 @@ from sklearn.metrics.pairwise import pairwise_distances
 class KNearestNeighbors(ClassifierMixin, BaseEstimator):
     """KNearestNeighbors classifier."""
 
-    def __init__(self, n_neighbors=1):  # noqa: D107
+    def __init__(self, n_neighbors=1):
         self.n_neighbors = n_neighbors
 
     def fit(self, X, y):
-        """Fit the nearest neighbors classifier."""
         X, y = validate_data(self, X, y)
 
-        target_type = type_of_target(y)
-        if target_type == "continuous":
+        if type_of_target(y) == "continuous":
             raise ValueError("continuous target is not supported")
 
         self.classes_ = np.unique(y)
@@ -35,9 +33,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return self
 
     def predict(self, X):
-        """Predict class labels for samples in X."""
         check_is_fitted(self, attributes=["X_", "y_", "classes_"])
-
         X = validate_data(self, X, reset=False)
 
         distances = pairwise_distances(X, self.X_)
@@ -52,26 +48,21 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return y_pred
 
     def score(self, X, y):
-        """Return accuracy on the given test data."""
-        y_pred = self.predict(X)
-        return np.mean(y_pred == y)
+        return np.mean(self.predict(X) == y)
+
 
 class MonthlySplit(BaseCrossValidator):
     """Cross-validator based on successive monthly splits."""
 
     def __init__(self, time_col="index"):
-        """Initialize the splitter."""
         self.time_col = time_col
 
     def __repr__(self):
-        """Return string representation."""
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        """Extract datetime index or column."""
         if isinstance(X, pd.Series):
             time = X.index
-
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -93,18 +84,22 @@ class MonthlySplit(BaseCrossValidator):
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
-        """Return number of splits."""
         time = self._get_datetime(X)
-        return max(len(time.to_period("M").unique()) - 1, 0)
+        months = np.sort(time.to_period("M").unique())
+        return max(len(months) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-        """Generate train/test indices."""
         time = self._get_datetime(X)
+
+        # IMPORTANT: preserve original row indices
+        indices = np.arange(len(time))
+
         months = time.to_period("M")
         unique_months = np.sort(months.unique())
 
-        indices = np.arange(len(time))
-
+        # For each month AFTER the first:
+        # train = all previous months
+        # test  = current month
         for month in unique_months[1:]:
             train_idx = indices[months < month]
             test_idx = indices[months == month]
