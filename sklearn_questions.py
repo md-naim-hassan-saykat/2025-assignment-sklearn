@@ -101,7 +101,7 @@ class MonthlySplit(BaseCrossValidator):
     unique_months = np.sort(months.unique())
 
     if self.time_col == "index":
-        # CUMULATIVE / EXPANDING window
+        # CUMULATIVE / expanding window
         for test_month in unique_months[1:]:
             train_idx = order[months < test_month]
             test_idx = order[months == test_month]
