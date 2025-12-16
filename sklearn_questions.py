@@ -64,15 +64,12 @@ class MonthlySplit(BaseCrossValidator):
         self.time_col = time_col
 
     def _get_time(self, X):
-        """Return a DatetimeIndex aligned with X rows."""
-        # Case 1: X is a datetime Series
+        """Extract datetime information from X."""
+        # Case 1: Series → time is index
         if isinstance(X, pd.Series):
-            if pd.api.types.is_datetime64_any_dtype(X):
-                time = X
-            else:
-                time = X.index
+            time = X.index
 
-        # Case 2: X is a DataFrame
+        # Case 2: DataFrame
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -88,24 +85,25 @@ class MonthlySplit(BaseCrossValidator):
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise TypeError("time column must be datetime")
-            time = pd.DatetimeIndex(time)
+            time = pd.DatetimeIndex(time.values)
 
+        # Validate index
         if not isinstance(time, pd.DatetimeIndex):
-            raise TypeError(f"unsupported Type {type(time).__name__}")
+            raise TypeError("time must be a DatetimeIndex")
 
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
+        """Return number of splitting iterations."""
         time = self._get_time(X)
-        months = np.sort(time.to_period("M").unique())
+        months = time.to_period("M").unique()
         return max(len(months) - 1, 0)
 
     def split(self, X, y=None, groups=None):
+        """Generate train/test indices."""
         time = self._get_time(X)
         months = time.to_period("M")
-
-        # IMPORTANT: sort months chronologically
-        unique_months = np.sort(months.unique())
+        unique_months = months.unique()
 
         for m_train, m_test in zip(unique_months[:-1], unique_months[1:]):
             train_idx = np.where(months == m_train)[0]
