@@ -57,7 +57,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return np.mean(y_pred == y)
 
 class MonthlySplit(BaseCrossValidator):
-    """Monthly time-based cross-validator."""
+    """Cross-validator based on successive monthly splits."""
 
     def __init__(self, time_col="index"):
         """Initialize the splitter."""
@@ -71,6 +71,7 @@ class MonthlySplit(BaseCrossValidator):
         """Extract datetime index or column."""
         if isinstance(X, pd.Series):
             time = X.index
+
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -97,10 +98,11 @@ class MonthlySplit(BaseCrossValidator):
         return max(len(time.to_period("M").unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-        """Generate indices."""
+        """Generate train/test indices."""
         time = self._get_datetime(X)
         months = time.to_period("M")
         unique_months = np.sort(months.unique())
+
         indices = np.arange(len(time))
 
         for month in unique_months[1:]:
