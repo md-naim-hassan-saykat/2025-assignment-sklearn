@@ -66,47 +66,44 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        # Series → use index
-        if isinstance(X, pd.Series):
+    if isinstance(X, pd.Series):
+        time = X.index
+
+    elif isinstance(X, pd.DataFrame):
+        if self.time_col == "index":
             time = X.index
-
-        # DataFrame
-        elif isinstance(X, pd.DataFrame):
-            if self.time_col == "index":
-                time = X.index
-            else:
-                if self.time_col not in X.columns:
-                    raise ValueError("datetime")
-                time = X[self.time_col]
         else:
-            raise ValueError("datetime")
-
-        # Series → DatetimeIndex
-        if isinstance(time, pd.Series):
-            if not pd.api.types.is_datetime64_any_dtype(time):
+            if self.time_col not in X.columns:
                 raise ValueError("datetime")
-            time = pd.DatetimeIndex(time.values)
+            time = X[self.time_col]
+    else:
+        raise ValueError("datetime")
 
-        if not isinstance(time, pd.DatetimeIndex):
+    # FIX: accept Series and convert
+    if isinstance(time, pd.Series):
+        if not pd.api.types.is_datetime64_any_dtype(time):
             raise ValueError("datetime")
+        time = pd.DatetimeIndex(time.values)
 
-        return time
+    if not isinstance(time, pd.DatetimeIndex):
+        raise ValueError("datetime")
+
+    return time
 
     def get_n_splits(self, X, y=None, groups=None):
         time = self._get_datetime(X)
         months = np.sort(time.to_period("M").unique())
         return max(len(months) - 1, 0)
 
-    def split(self, X, y=None, groups=None):
-        time = self._get_datetime(X)
+def split(self, X, y=None, groups=None):
+    time = self._get_datetime(X)
 
-        # Sort samples by time
-        order = np.argsort(time.values)
-        time_sorted = time.values[order]
-        months = pd.PeriodIndex(time_sorted, freq="M")
-        unique_months = np.unique(months)
+    order = np.argsort(time.values)
+    time_sorted = time.values[order]
+    months = pd.PeriodIndex(time_sorted, freq="M")
+    unique_months = np.unique(months)
 
-        for i in range(1, len(unique_months)):
-            train_idx = order[months < unique_months[i]]
-            test_idx = order[months == unique_months[i]]
-            yield train_idx, test_idx
+    for i in range(1, len(unique_months)):
+        train_idx = order[months < unique_months[i]]
+        test_idx = order[months == unique_months[i]]
+        yield train_idx, test_idx
