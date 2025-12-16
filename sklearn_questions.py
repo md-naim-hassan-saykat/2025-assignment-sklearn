@@ -64,8 +64,11 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
+        # Case 1: X is a Series → use index
         if isinstance(X, pd.Series):
             time = X.index
+
+        # Case 2: X is a DataFrame
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -73,14 +76,17 @@ class MonthlySplit(BaseCrossValidator):
                 if self.time_col not in X.columns:
                     raise ValueError("datetime")
                 time = X[self.time_col]
+
         else:
             raise ValueError("datetime")
 
+        # Convert Series → DatetimeIndex
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
             time = pd.DatetimeIndex(time)
 
+        # Final check
         if not isinstance(time, pd.DatetimeIndex):
             raise ValueError("datetime")
 
@@ -94,18 +100,15 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
-        # Sort by time (works even if shuffled)
+        # Always sort by time (works even if shuffled)
         order = np.argsort(time.values)
         time_sorted = time.values[order]
         months_sorted = pd.PeriodIndex(time_sorted, freq="M")
         unique_months = np.sort(pd.unique(months_sorted))
 
         for i in range(len(unique_months) - 1):
-            # cumulative training set
+            # cumulative training
             train_mask = months_sorted <= unique_months[i]
             test_mask = months_sorted == unique_months[i + 1]
 
-            train_idx = order[train_mask]
-            test_idx = order[test_mask]
-
-            yield train_idx, test_idx
+            yield order[train_mask], order[test_mask]
