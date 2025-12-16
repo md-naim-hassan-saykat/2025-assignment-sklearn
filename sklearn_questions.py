@@ -57,18 +57,38 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         return np.mean(y_pred == y)
 
 class MonthlySplit(BaseCrossValidator):
+    """Cross-validator that splits data using cumulative monthly splits."""
+
     def __init__(self, time_col="index"):
+        """Initialize the MonthlySplit.
+
+        Parameters
+        ----------
+        time_col : str, default="index"
+            Column name containing datetime values, or "index".
+        """
         self.time_col = time_col
 
     def __repr__(self):
+        """Return string representation."""
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        # Case 1: X is a Series → use index
+        """Extract datetime index from input data.
+
+        Parameters
+        ----------
+        X : pandas Series or DataFrame
+            Input data.
+
+        Returns
+        -------
+        pandas.DatetimeIndex
+            Datetime index aligned with X.
+        """
         if isinstance(X, pd.Series):
             time = X.index
 
-        # Case 2: X is a DataFrame
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -80,35 +100,36 @@ class MonthlySplit(BaseCrossValidator):
         else:
             raise ValueError("datetime")
 
-        # Convert Series → DatetimeIndex
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
             time = pd.DatetimeIndex(time)
 
-        # Final check
         if not isinstance(time, pd.DatetimeIndex):
             raise ValueError("datetime")
 
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
+        """Return number of splitting iterations."""
         time = self._get_datetime(X)
-        months = np.sort(time.to_period("M").unique())
+        months = time.to_period("M").unique()
         return max(len(months) - 1, 0)
 
     def split(self, X, y=None, groups=None):
+        """Generate indices for cumulative monthly splits."""
         time = self._get_datetime(X)
 
-        # Always sort by time (works even if shuffled)
         order = np.argsort(time.values)
         time_sorted = time.values[order]
-        months_sorted = pd.PeriodIndex(time_sorted, freq="M")
-        unique_months = np.sort(pd.unique(months_sorted))
+        months = pd.PeriodIndex(time_sorted, freq="M")
+        unique_months = np.unique(months)
 
-        for i in range(len(unique_months) - 1):
-            # cumulative training
-            train_mask = months_sorted <= unique_months[i]
-            test_mask = months_sorted == unique_months[i + 1]
+        for i in range(1, len(unique_months)):
+            train_mask = months < unique_months[i]
+            test_mask = months == unique_months[i]
 
-            yield order[train_mask], order[test_mask]
+            train_idx = order[train_mask]
+            test_idx = order[test_mask]
+
+            yield train_idx, test_idx
