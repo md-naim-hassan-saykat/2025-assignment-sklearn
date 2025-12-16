@@ -82,12 +82,12 @@ class MonthlySplit(BaseCrossValidator):
             raise ValueError("datetime")
 
         # Convert Series → DatetimeIndex
-   if isinstance(time, pd.Series):
+if isinstance(time, pd.Series):
     if not pd.api.types.is_datetime64_any_dtype(time):
         raise ValueError("datetime")
     time = pd.DatetimeIndex(time.values)
 
-    if not isinstance(time, pd.DatetimeIndex):
+if not isinstance(time, pd.DatetimeIndex):
     raise ValueError("datetime")
 
         return time
