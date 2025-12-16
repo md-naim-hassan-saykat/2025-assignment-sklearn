@@ -60,6 +60,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         """Return accuracy on the given test data."""
         return np.mean(self.predict(X) == y)
 
+
 class MonthlySplit(BaseCrossValidator):
     """Cross-validator based on monthly time splits."""
 
