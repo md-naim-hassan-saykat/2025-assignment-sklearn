@@ -73,7 +73,6 @@ class MonthlySplit(BaseCrossValidator):
         else:
             raise ValueError("datetime")
 
-        # allow Series but enforce datetime dtype
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
@@ -91,7 +90,6 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
-        # sort by time but keep original indices
         order = np.argsort(time.values)
         time_sorted = time.values[order]
 
@@ -99,10 +97,6 @@ class MonthlySplit(BaseCrossValidator):
         unique_months = np.sort(months.unique())
 
         for test_month in unique_months[1:]:
-            train_mask = months < test_month
-            test_mask = months == test_month
-
-            train_idx = order[train_mask]
-            test_idx = order[test_mask]
-
+            train_idx = order[months < test_month]
+            test_idx = order[months == test_month]
             yield train_idx, test_idx
