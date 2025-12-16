@@ -66,11 +66,11 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        # Series: use index as time
+        # Series → use index
         if isinstance(X, pd.Series):
             time = X.index
 
-        # DataFrame: either use index or a specific column
+        # DataFrame
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -81,13 +81,12 @@ class MonthlySplit(BaseCrossValidator):
         else:
             raise ValueError("datetime")
 
-        # If time is a Series, ensure it's datetime and convert to DatetimeIndex
+        # Series → DatetimeIndex
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
             time = pd.DatetimeIndex(time.values)
 
-        # Finally, must be a DatetimeIndex
         if not isinstance(time, pd.DatetimeIndex):
             raise ValueError("datetime")
 
@@ -101,12 +100,13 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
-        # Sort by time (important if X was shuffled)
+        # Sort samples by time
         order = np.argsort(time.values)
-        months_sorted = pd.PeriodIndex(time.values[order], freq="M")
-        unique_months = np.unique(months_sorted)
+        time_sorted = time.values[order]
+        months = pd.PeriodIndex(time_sorted, freq="M")
+        unique_months = np.unique(months)
 
-        for prev_month, curr_month in zip(unique_months[:-1], unique_months[1:]):
-            train_idx = order[months_sorted == prev_month]
-            test_idx = order[months_sorted == curr_month]
+        for i in range(1, len(unique_months)):
+            train_idx = order[months < unique_months[i]]
+            test_idx = order[months == unique_months[i]]
             yield train_idx, test_idx
