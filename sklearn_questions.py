@@ -62,51 +62,28 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
 
 
 class MonthlySplit(BaseCrossValidator):
-    """Cross-validator based on successive monthly splits.
-
-    Behavior
-    --------
-    - If time_col == "index": expanding window
-      train = all months before the test month
-      test  = the test month
-    - If time_col != "index": rolling window
-      train = previous month only
-      test  = next month only
-    """
+    """Cross-validator based on datetime data."""
 
     def __init__(self, time_col="index"):
-        """Initialize the splitter.
-
-        Parameters
-        ----------
-        time_col : str, default="index"
-            Where to read the datetime information from. Use "index" to use
-            X.index, otherwise use X[time_col] from a DataFrame.
-        """
         self.time_col = time_col
 
     def __repr__(self):
-        """Return string representation."""
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
-        """Extract datetime index or datetime column from X."""
-        if isinstance(X, pd.DataFrame):
+        if isinstance(X, pd.Series):
+            time = X.index
+
+        elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
             else:
                 if self.time_col not in X.columns:
                     raise ValueError("datetime")
                 time = X[self.time_col]
-        elif isinstance(X, pd.Series):
-            # Only sensible interpretation for a Series is to use its index
-            if self.time_col != "index":
-                raise TypeError("unsupported Type Series")
-            time = X.index
         else:
-            raise TypeError(f"unsupported Type {type(X).__name__}")
+            raise ValueError("datetime")
 
-        # Convert to DatetimeIndex and validate dtype
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
@@ -118,37 +95,34 @@ class MonthlySplit(BaseCrossValidator):
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
-        """Return the number of splitting iterations in the cross-validator."""
         time = self._get_datetime(X)
-        months = time.to_period("M")
-        return max(len(months.unique()) - 1, 0)
+        return max(len(time.to_period("M").unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
-    """Generate train/test indices."""
-    time = self._get_datetime(X)
+        time = self._get_datetime(X)
 
-    # Sort by time (important if data is shuffled)
-    order = np.argsort(time.values)
-    time_sorted = time.values[order]
+        # sort by time (important if X is shuffled)
+        order = np.argsort(time.values)
+        time_sorted = time.values[order]
 
-    months = pd.PeriodIndex(time_sorted, freq="M")
-    unique_months = np.sort(months.unique())
+        months = pd.PeriodIndex(time_sorted, freq="M")
+        unique_months = np.sort(months.unique())
 
-    if len(unique_months) <= 1:
-        return
+        if len(unique_months) <= 1:
+            return
 
-    # CASE 1: index-based → expanding window
-    if self.time_col == "index":
-        for test_month in unique_months[1:]:
-            train_idx = order[months < test_month]
-            test_idx = order[months == test_month]
-            yield train_idx, test_idx
+        # CASE 1: index-based → expanding window
+        if self.time_col == "index":
+            for test_month in unique_months[1:]:
+                train_idx = order[months < test_month]
+                test_idx = order[months == test_month]
+                yield train_idx, test_idx
 
-    # CASE 2: column-based → rolling 1-month window
-    else:
-        for prev_month, curr_month in zip(
-            unique_months[:-1], unique_months[1:]
-        ):
-            train_idx = order[months == prev_month]
-            test_idx = order[months == curr_month]
-            yield train_idx, test_idx
+        # CASE 2: column-based → rolling ONE-month window
+        else:
+            for prev_month, curr_month in zip(
+                unique_months[:-1], unique_months[1:]
+            ):
+                train_idx = order[months == prev_month]
+                test_idx = order[months == curr_month]
+                yield train_idx, test_idx
