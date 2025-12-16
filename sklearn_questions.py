@@ -63,49 +63,53 @@ class MonthlySplit(BaseCrossValidator):
     def __init__(self, time_col="index"):  # noqa: D107
         self.time_col = time_col
 
-    def _get_datetime_index(self, X):
-        """Return a DatetimeIndex from X."""
+    def _get_time_index(self, X):
+        """Return a DatetimeIndex representing time for each sample."""
         if isinstance(X, pd.Series):
-            time = X
+            # For Series, time is in the index (tests use this case)
+            time = X.index
+
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
             else:
-                time = X[self.time_col]
-        else:
-            raise TypeError("X must be a pandas DataFrame or Series")
+                if self.time_col not in X.columns:
+                    raise ValueError("time_col not found in X")
+                time = X[self.time_col]  # this is a Series
 
+        else:
+            raise TypeError("X must be a pandas Series or DataFrame")
+
+        # If time is a Series, convert it to DatetimeIndex
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise TypeError("time column must be datetime")
             time = pd.DatetimeIndex(time)
 
+        # If time is already an Index, ensure it is datetime
         if not isinstance(time, pd.DatetimeIndex):
-            raise TypeError("time must be a DatetimeIndex")
+            raise TypeError(f"unsupported Type {type(time).__name__}")
 
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return number of splitting iterations."""
-        time = self._get_datetime_index(X)
+        time = self._get_time_index(X)
         months = time.to_period("M")
         return max(len(months.unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
         """Generate train/test indices."""
-        time = self._get_datetime_index(X)
+        time = self._get_time_index(X)
 
-        # sort by time but keep original indices
-        order = np.argsort(time.values)
-        time_sorted = time.values[order]
+        # Sort by time but keep original indices
+        order = np.argsort(time.to_numpy())
+        time_sorted = time.to_numpy()[order]
+
         months = pd.PeriodIndex(time_sorted, freq="M")
         unique_months = months.unique()
 
         for m_train, m_test in zip(unique_months[:-1], unique_months[1:]):
-            mask_train = months == m_train
-            mask_test = months == m_test
-
-            train_idx = order[mask_train]
-            test_idx = order[mask_test]
-
+            train_idx = order[months == m_train]
+            test_idx = order[months == m_test]
             yield train_idx, test_idx
