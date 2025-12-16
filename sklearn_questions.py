@@ -82,13 +82,13 @@ class MonthlySplit(BaseCrossValidator):
             raise ValueError("datetime")
 
         # Convert Series → DatetimeIndex
-        if isinstance(time, pd.Series):
-            if not pd.api.types.is_datetime64_any_dtype(time):
-                raise ValueError("datetime")
-            time = pd.DatetimeIndex(time.values)
+   if isinstance(time, pd.Series):
+    if not pd.api.types.is_datetime64_any_dtype(time):
+        raise ValueError("datetime")
+    time = pd.DatetimeIndex(time.values)
 
-        if not isinstance(time, pd.DatetimeIndex):
-            raise ValueError("datetime")
+    if not isinstance(time, pd.DatetimeIndex):
+    raise ValueError("datetime")
 
         return time
 
@@ -97,13 +97,23 @@ class MonthlySplit(BaseCrossValidator):
         months = np.sort(time.to_period("M").unique())
         return max(len(months) - 1, 0)
 
-    def split(self, X, y=None, groups=None):
-        time = self._get_datetime(X)
-        months = time.to_period("M")
-        unique_months = np.sort(months.unique())
+def split(self, X, y=None, groups=None):
+    time = self._get_datetime(X)
 
-        # SUCCESSIVE monthly splits (not cumulative)
-        for prev_month, curr_month in zip(unique_months[:-1], unique_months[1:]):
-            train_idx = np.where(months == prev_month)[0]
-            test_idx = np.where(months == curr_month)[0]
-            yield train_idx, test_idx
+    # 1. Sort indices by time
+    order = np.argsort(time.values)
+    time_sorted = time.values[order]
+    months_sorted = pd.PeriodIndex(time_sorted, freq="M")
+
+    # 2. Unique months in chronological order
+    unique_months = np.unique(months_sorted)
+
+    # 3. Generate successive month splits
+    for prev_month, curr_month in zip(unique_months[:-1], unique_months[1:]):
+        train_mask = months_sorted == prev_month
+        test_mask = months_sorted == curr_month
+
+        train_idx = order[train_mask]
+        test_idx = order[test_mask]
+
+        yield train_idx, test_idx
