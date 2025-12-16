@@ -105,13 +105,13 @@ class MonthlySplit(BaseCrossValidator):
     unique_months = np.sort(months.unique())
 
     if self.time_col == "index":
-        # EXPANDING window
+        # EXPANDING (cumulative) window
         for test_month in unique_months[1:]:
             train_idx = order[months < test_month]
             test_idx = order[months == test_month]
             yield train_idx, test_idx
     else:
-        # ROLLING one-month window (this is what test_time_split_on_column checks)
+        # ROLLING one-month window
         for prev_month, curr_month in zip(
             unique_months[:-1], unique_months[1:]
         ):
