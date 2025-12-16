@@ -79,7 +79,7 @@ class MonthlySplit(BaseCrossValidator):
                 time = X[self.time_col]
 
         else:
-            raise TypeError("unsupported Type")
+            raise ValueError("datetime")
 
         # Convert Series → DatetimeIndex
         if isinstance(time, pd.Series):
@@ -102,12 +102,8 @@ class MonthlySplit(BaseCrossValidator):
         months = time.to_period("M")
         unique_months = np.sort(months.unique())
 
-        for i in range(1, len(unique_months)):
-            test_month = unique_months[i]
-            train_mask = months < test_month
-            test_mask = months == test_month
-
-            train_idx = np.where(train_mask)[0]
-            test_idx = np.where(test_mask)[0]
-
+        # SUCCESSIVE monthly splits (not cumulative)
+        for prev_month, curr_month in zip(unique_months[:-1], unique_months[1:]):
+            train_idx = np.where(months == prev_month)[0]
+            test_idx = np.where(months == curr_month)[0]
             yield train_idx, test_idx
