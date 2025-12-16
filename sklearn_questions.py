@@ -63,38 +63,49 @@ class MonthlySplit(BaseCrossValidator):
     def __init__(self, time_col="index"):  # noqa: D107
         self.time_col = time_col
 
-    def _get_datetime(self, X):
-        """Extract datetime series from input."""
+    def _get_datetime_index(self, X):
+        """Return a DatetimeIndex from X."""
         if isinstance(X, pd.Series):
-            time = X.index
+            time = X
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
             else:
                 time = X[self.time_col]
         else:
-            raise TypeError("unsupported Type")
+            raise TypeError("X must be a pandas DataFrame or Series")
+
+        if isinstance(time, pd.Series):
+            if not pd.api.types.is_datetime64_any_dtype(time):
+                raise TypeError("time column must be datetime")
+            time = pd.DatetimeIndex(time)
 
         if not isinstance(time, pd.DatetimeIndex):
-            raise TypeError(f"unsupported Type {type(time).__name__}")
+            raise TypeError("time must be a DatetimeIndex")
 
         return time
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return number of splitting iterations."""
-        time = self._get_datetime(X)
-        months = time.to_period("M").unique()
-        return max(len(months) - 1, 0)
+        time = self._get_datetime_index(X)
+        months = time.to_period("M")
+        return max(len(months.unique()) - 1, 0)
 
     def split(self, X, y=None, groups=None):
         """Generate train/test indices."""
-        time = self._get_datetime(X)
-        months = time.to_period("M")
+        time = self._get_datetime_index(X)
+
+        # sort by time but keep original indices
+        order = np.argsort(time.values)
+        time_sorted = time.values[order]
+        months = pd.PeriodIndex(time_sorted, freq="M")
         unique_months = months.unique()
 
-        for train_month, test_month in zip(
-            unique_months[:-1], unique_months[1:]
-        ):
-            train_idx = np.where(months == train_month)[0]
-            test_idx = np.where(months == test_month)[0]
+        for m_train, m_test in zip(unique_months[:-1], unique_months[1:]):
+            mask_train = months == m_train
+            mask_test = months == m_test
+
+            train_idx = order[mask_train]
+            test_idx = order[mask_test]
+
             yield train_idx, test_idx
