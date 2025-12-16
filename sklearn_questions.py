@@ -86,27 +86,25 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y=None, groups=None):
     time = self._get_datetime(X)
 
+    # sort by time (important when shuffled)
     order = np.argsort(time.values)
     time_sorted = time.values[order]
+
     months = pd.PeriodIndex(time_sorted, freq="M")
     unique_months = np.sort(months.unique())
 
-    # INDEX-based → rolling cumulative
+    # CASE 1: index-based → cumulative expanding window
     if self.time_col == "index":
         for test_month in unique_months[1:]:
             train_idx = order[months < test_month]
             test_idx = order[months == test_month]
             yield train_idx, test_idx
 
-    # COLUMN-based → single split, previous month only
+    # CASE 2: column-based → rolling single-month window
     else:
-        if len(unique_months) < 2:
-            return
-
-        train_month = unique_months[-2]
-        test_month = unique_months[-1]
-
-        train_idx = order[months == train_month]
-        test_idx = order[months == test_month]
-
-        yield train_idx, test_idx
+        for prev_month, curr_month in zip(
+            unique_months[:-1], unique_months[1:]
+        ):
+            train_idx = order[months == prev_month]
+            test_idx = order[months == curr_month]
+            yield train_idx, test_idx
