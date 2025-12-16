@@ -90,10 +90,6 @@ class MonthlySplit(BaseCrossValidator):
 
         return time
 
-    def get_n_splits(self, X, y=None, groups=None):
-        time = self._get_datetime(X)
-        return max(len(time.to_period("M").unique()) - 1, 0)
-
     def split(self, X, y=None, groups=None):
     time = self._get_datetime(X)
 
@@ -105,7 +101,7 @@ class MonthlySplit(BaseCrossValidator):
     unique_months = np.sort(months.unique())
 
     if self.time_col == "index":
-        # EXPANDING (cumulative) window
+        # CUMULATIVE / EXPANDING window
         for test_month in unique_months[1:]:
             train_idx = order[months < test_month]
             test_idx = order[months == test_month]
