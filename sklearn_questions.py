@@ -60,9 +60,11 @@ class MonthlySplit(BaseCrossValidator):
         return f"MonthlySplit(time_col='{self.time_col}')"
 
     def _get_datetime(self, X):
+        # Series → always use index
         if isinstance(X, pd.Series):
             time = X.index
 
+        # DataFrame
         elif isinstance(X, pd.DataFrame):
             if self.time_col == "index":
                 time = X.index
@@ -70,10 +72,10 @@ class MonthlySplit(BaseCrossValidator):
                 if self.time_col not in X.columns:
                     raise ValueError("datetime")
                 time = X[self.time_col]
-
         else:
             raise ValueError("datetime")
 
+        # Convert Series to DatetimeIndex
         if isinstance(time, pd.Series):
             if not pd.api.types.is_datetime64_any_dtype(time):
                 raise ValueError("datetime")
@@ -92,7 +94,7 @@ class MonthlySplit(BaseCrossValidator):
     def split(self, X, y=None, groups=None):
         time = self._get_datetime(X)
 
-        # sort by time, but keep original indices
+        # sort by time, keep original indices
         order = np.argsort(time.values)
         time_sorted = time.values[order]
         months_sorted = pd.PeriodIndex(time_sorted, freq="M")
